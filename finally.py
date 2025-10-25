@@ -389,7 +389,15 @@ def main():
     # Hilo para procesar mensajes CAN
 
     # Loop MQTT (solo comunicación)
-    client.loop_start()
+    try:
+        client.loop_forever()
+    except KeyboardInterrupt:
+        print("🔴 Programa terminado por el usuario")
+    finally:
+        disable_node(left_node)
+        disable_node(right_node)
+        network.disconnect()
+        print("🔌 Conexión CAN cerrada")
 
 
 if __name__ == "__main__":
