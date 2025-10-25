@@ -373,6 +373,7 @@ def on_connect(client, userdata, flags, rc):
     print(f"📡 Suscrito al topic: {right_topic}\n") 
     print(f"📡 Suscrito al topic: {left_topic}\n") 
     print(f"📡 Suscrito al topic: {vel_topic}\n")
+    print(f"📡 Suscrito al topic: {square_topic}\n")
 def main():
     network = canopen.Network()
     
