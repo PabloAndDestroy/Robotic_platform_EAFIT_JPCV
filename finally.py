@@ -349,7 +349,11 @@ def on_message(client, userdata, msg):
         payload = json.loads(msg.payload)
         print(f"📩 Mensaje recibido en {SQUARE_LABEL}: {payload}")
         if payload == 1:
-            mover_cuadrado_m(left_node, right_node, side_length=1.0, speed=200)
+                set_velocity(node_left, speed * 0.8)
+                set_velocity(node_right, speed * 2.8)
+                time.sleep(5.91)
+                set_velocity(node_left, 0)
+                set_velocity(node_right, 0)
 
 def on_connect(client, userdata, flags, rc): 
     
@@ -376,16 +380,18 @@ def on_connect(client, userdata, flags, rc):
     print(f"📡 Suscrito al topic: {square_topic}\n")
 def main():
     network = canopen.Network()
-    
-    network.connect(channel=CHANNEL, bustype='socketcan', bitrate=BAUDRATE)
-    left_node = network.add_node(LEFT_ID, EDS_FILE)
-    right_node = network.add_node(RIGHT_ID, EDS_FILE)
-    client = mqtt.Client(userdata ={"left": left_node, "right": right_node})
-    client.username_pw_set(ADMIN, PASSWORD)
-    client.on_connect = on_connect
-    client.on_message = on_message
-
-    client.connect(BROKER_EAFIT, 1883, 60)
+    try: 
+        network.connect(channel=CHANNEL, bustype='socketcan', bitrate=BAUDRATE)
+        left_node = network.add_node(LEFT_ID, EDS_FILE)
+        right_node = network.add_node(RIGHT_ID, EDS_FILE)
+        client = mqtt.Client(userdata ={"left": left_node, "right": right_node})
+        client.username_pw_set(ADMIN, PASSWORD)
+        client.on_connect = on_connect
+        client.on_message = on_message 
+        client.connect(BROKER_EAFIT, 1883, 60)
+    except Exception as e:
+        print(f"❌ Error de conexión: {e}")
+        return
 
     # Hilo para procesar mensajes CAN
 
