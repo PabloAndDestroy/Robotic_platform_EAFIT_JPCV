@@ -56,8 +56,7 @@ def enable_node(node):
         node.sdo['Actual position'].raw=0
         node.sdo['Velocity feedback'][0].raw = 2410
         print(f"✅ Nodo {node.id} habilitado")
-        msg = can.Message(arbitration_id=0x000,  data=[0x01, 0x00],is_extended_id=False)
-        node.network.send_message(msg.arbitration_id, msg.data)
+
     except Exception as e:
         print(f"❌ Error habilitando nodo {node.id}: {e}")
 # Apaga los drivers
