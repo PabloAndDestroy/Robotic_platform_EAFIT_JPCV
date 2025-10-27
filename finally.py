@@ -102,7 +102,7 @@ def giro_90(node_left, node_right, speed):
             angulo = get_angle_degrees(node_right)
             set_velocity(node_left, speed*0.8)
             set_velocity(node_right, -speed*2.8)
-            
+
             break
 def locate(node):
     try:
@@ -131,8 +131,8 @@ def get_angle_degrees(node):
 
         # Asegurar que quede en el rango [0, 360)
         angle = angle % 360.0
-        topic_ang = f"/Thingworx/{DEVICE_LABEL}/Enconder_1"
-        client.publish(topic_ang, json.dumps({"Encoder_1": angle}))
+      #  topic_ang = f"/Thingworx/{DEVICE_LABEL}/Enconder_1"
+     #   client.publish(topic_ang, json.dumps({"Encoder_1": angle}))
         return angle
     except Exception as e:
         print(f"❌ Error convirtiendo a grados nodo {node.id}: {e}")
@@ -167,107 +167,57 @@ def mover_linea_recta(node_left, node_right, distance, speed):
 def mover_cuadrado_m(node_left, node_right, side_length, speed, R=0.15/2):
     """
     Mueve el robot en forma cuadrada usando control por encoders.
-    
+
     node_left, node_right : nodos de los motores
     side_length           : longitud del lado del cuadrado (m)
     speed                 : velocidad base (RPM o equivalente)
     R                     : radio de la rueda (m)
     """
 
-    state = 0
-    sides_completed = 0
-    angulo = get_angle_degrees(node_left)
-
-    # Reiniciar encoders si es posible
-    # Mover hasta enconder == 0
-    state = 0
-    sides_completed = 0
-    start_angle = 0
-    start_time = 0
-    set_velocity(node_left, speed * 0.8)
-    set_velocity(node_right, speed * 2.8)
-    time.sleep(5.91)
-    set_velocity(node_left, 0)
-    set_velocity(node_right, 0)
     print("🟢 Iniciando dibujo del cuadrado...")
-    
+    sides_completed = 0
+    state = 0
+    start_time = time.time()
+    speed = 200
+    tiempo_avance = side_length/0.169    # tiempo para avanzar un lado
+    tiempo_giro = 2.2     # tiempo estimado para girar 90°
 
-    """while sides_completed < 4:
-        angulo = get_angle_degrees(node_left)  # Se asume función que devuelve grados del encoder
-
-        # ───────────────────────────────────────────────
-        # Estado 0: Alinear (corrección inicial de ángulo)
-        # ───────────────────────────────────────────────
+    while sides_completed < 4:
         if state == 0:
-            if angulo > 5:
-                set_velocity(node_left, speed * 0.8)
-                set_velocity(node_right, speed * 2.8)
-            else:
-                set_velocity(node_left, 0)
-                set_velocity(node_right, 0)
-                state = 1
-                start_angle = angulo
-                print(f"➡️  Estado 1: avanzar lado {sides_completed + 1}")
+            print(f"➡️ Avanzando lado {sides_completed + 1}")
+            set_velocity(node_left, speed * 0.8)
+            set_velocity(node_right, speed * 2.8)
+            start_time = time.time()
+            state = 1
 
-        # ───────────────────────────────────────────────
-        # Estado 1: Avanzar un lado del cuadrado
-        # ───────────────────────────────────────────────
         elif state == 1:
-            distancia = 0.075 * np.deg2rad(abs(angulo - start_angle))  # 0.075 ≈ radio de rueda (m)
-            if distancia < side_length:
-                set_velocity(node_left, speed * 0.8)
-                set_velocity(node_right, speed * 2.8)
-            else:
+            if time.time() - start_time >= tiempo_avance:
                 set_velocity(node_left, 0)
                 set_velocity(node_right, 0)
                 sides_completed += 1
-                state = 2
-                start_time = time.time()
                 print(f"✅ Lado {sides_completed} completado — girando...")
+                time.sleep(1)
+                start_time = time.time()
+                state = 2
 
-        # ───────────────────────────────────────────────
-        # Estado 2: Giro de 90 grados
-        # ───────────────────────────────────────────────
         elif state == 2:
-            # Ajusta este tiempo según la velocidad del robot para un giro de 90°
-            if time.time() - start_time < 1.15:
+            if time.time() - start_time < tiempo_giro:
                 set_velocity(node_left, speed * 0.8)
                 set_velocity(node_right, -speed * 2.8)
             else:
                 set_velocity(node_left, 0)
                 set_velocity(node_right, 0)
-                state = 3
-                start_time = time.time()
-                print("↪️ Giro completado — avanzando corto...")
+                state = 0
+                time.sleep(1)
 
-        # ───────────────────────────────────────────────
-        # Estado 3: Avance corto antes del siguiente lado
-        # ───────────────────────────────────────────────
-        elif state == 3:
-            duracion = 8.8 if speed == 200 else 5.9
-            if time.time() - start_time < duracion:
-                set_velocity(node_left, speed * 0.8)
-                set_velocity(node_right, speed * 2.8)
-            else:
-                set_velocity(node_left, 0)
-                set_velocity(node_right, 0)
-                state = 0  # 🔁 reiniciar ciclo
-                print(f"🔁 Listo para siguiente lado ({sides_completed + 1}/4)\n")
+        time.sleep(0.05)
 
-        # ───────────────────────────────────────────────
-        # Pequeña pausa para no saturar el bus CAN
-        # ───────────────────────────────────────────────
-        time.sleep(0.01)
-
-    # Fin del cuadrado
     set_velocity(node_left, 0)
     set_velocity(node_right, 0)
-    print("🏁 Cuadro completado exitosamente ✅")"""
+    print("🏁 Cuadro completado ✅")
 
-        
-            
-   
-            
+
+
 def girar_rueda_360(node_left, node_right, speed):
     angulo = 0
     while True:
@@ -278,12 +228,12 @@ def girar_rueda_360(node_left, node_right, speed):
             set_velocity(node_left, 0)
             set_velocity(node_right, 0)
             break
-    
+
 
 class Estado_vel:
     rpm = 0
 
-    
+
 def on_message(client, userdata, msg):
     left_node = userdata["left"]
     right_node = userdata["right"]
@@ -301,11 +251,11 @@ def on_message(client, userdata, msg):
 
     elif msg.topic == f"/Thingworx/{DEVICE_LABEL}/{VEL_LABEL}":
         payload = json.loads(msg.payload)
-        
+
         print(f"📩 Mensaje recibido en {VEL_LABEL}: {payload}")
         Estado_vel.rpm = float((payload))
         Estado_vel.rpm = int(Estado_vel.rpm)
-        
+
     elif msg.topic == f"/Thingworx/{DEVICE_LABEL}/{UP_LABEL}":
         payload = json.loads(msg.payload)
         print(f"📩 Mensaje recibido en {UP_LABEL}: {payload}")
@@ -354,56 +304,115 @@ def on_message(client, userdata, msg):
                 set_velocity(node_left, 0)
                 set_velocity(node_right, 0)
 
-def on_connect(client, userdata, flags, rc): 
-    
-    print("🟢 Conectado al broker MQTT con código:", rc) 
-    on_topic = f"/Thingworx/{DEVICE_LABEL}/{ON_LABEL}" 
-    up_topic = f"/Thingworx/{DEVICE_LABEL}/{UP_LABEL}" 
-    down_topic = f"/Thingworx/{DEVICE_LABEL}/{DOWN_LABEL}" 
-    right_topic = f"/Thingworx/{DEVICE_LABEL}/{RIGHT_LABEL}" 
-    left_topic = f"/Thingworx/{DEVICE_LABEL}/{LEFT_LABEL}" 
-    vel_topic = f"/Thingworx/{DEVICE_LABEL}/{VEL_LABEL}" 
+def on_connect(client, userdata, flags, rc):
+
+    print("🟢 Conectado al broker MQTT con código:", rc)
+    on_topic = f"/Thingworx/{DEVICE_LABEL}/{ON_LABEL}"
+    up_topic = f"/Thingworx/{DEVICE_LABEL}/{UP_LABEL}"
+    down_topic = f"/Thingworx/{DEVICE_LABEL}/{DOWN_LABEL}"
+    right_topic = f"/Thingworx/{DEVICE_LABEL}/{RIGHT_LABEL}"
+    left_topic = f"/Thingworx/{DEVICE_LABEL}/{LEFT_LABEL}"
+    vel_topic = f"/Thingworx/{DEVICE_LABEL}/{VEL_LABEL}"
     square_topic = f"/Thingworx/{DEVICE_LABEL}/{SQUARE_LABEL}"
-    client.subscribe(on_topic) 
-    client.subscribe(up_topic) 
-    client.subscribe(down_topic) 
-    client.subscribe(right_topic) 
-    client.subscribe(left_topic) 
-    client.subscribe(vel_topic) 
-    print(f"📡 Suscrito al topic: {on_topic}") 
-    print(f"📡 Suscrito al topic: {up_topic}\n") 
-    print(f"📡 Suscrito al topic: {down_topic}\n") 
-    print(f"📡 Suscrito al topic: {right_topic}\n") 
-    print(f"📡 Suscrito al topic: {left_topic}\n") 
+    client.subscribe(on_topic)
+    client.subscribe(up_topic)
+    client.subscribe(down_topic)
+    client.subscribe(right_topic)
+    client.subscribe(left_topic)
+    client.subscribe(vel_topic)
+    client.subscribe(square_topic)
+    print(f"📡 Suscrito al topic: {on_topic}")
+    print(f"📡 Suscrito al topic: {up_topic}\n")
+    print(f"📡 Suscrito al topic: {down_topic}\n")
+    print(f"📡 Suscrito al topic: {right_topic}\n")
+    print(f"📡 Suscrito al topic: {left_topic}\n")
     print(f"📡 Suscrito al topic: {vel_topic}\n")
     print(f"📡 Suscrito al topic: {square_topic}\n")
 def main():
     network = canopen.Network()
-    try: 
+    network.connect(channel=CHANNEL, bustype='socketcan', bitrate=BAUDRATE)
+    left_node = network.add_node(LEFT_ID, EDS_FILE)
+    right_node = network.add_node(RIGHT_ID, EDS_FILE)
+    enable_node(left_node)
+    enable_node(right_node)
+    """try:
         network.connect(channel=CHANNEL, bustype='socketcan', bitrate=BAUDRATE)
-        left_node = network.add_node(LEFT_ID, EDS_FILE)
-        right_node = network.add_node(RIGHT_ID, EDS_FILE)
+
         client = mqtt.Client(userdata ={"left": left_node, "right": right_node})
         client.username_pw_set(ADMIN, PASSWORD)
         client.on_connect = on_connect
-        client.on_message = on_message 
+        client.on_message = on_message
         client.connect(BROKER_EAFIT, 1883, 60)
     except Exception as e:
         print(f"❌ Error de conexión: {e}")
-        return
+        return"""
 
     # Hilo para procesar mensajes CAN
 
     # Loop MQTT (solo comunicación)
     try:
-        client.loop_forever()
+        rpm=0
+        while True:
+            print_velocity(left_node)
+            print_velocity(right_node)
+            pos_counts = locate(right_node)
+            pos_deg = get_angle_degrees(right_node)
+
+            print(f"Posición nodo der (counts): {pos_counts}")
+            print(f"Posición nodo der (grados): {pos_deg:.2f}°")
+            key = get_key().lower()
+            if key == "q":
+                break
+            elif key == "w":
+                set_velocity(right_node, rpm*2.8)
+                set_control_pid(right_node)
+                set_velocity(left_node, rpm*0.7)
+                print(f"Posición nodo der (grados): {pos_deg:.2f}°")
+
+
+            elif key == "s":
+                set_velocity(left_node, -rpm*0.7)
+                set_velocity(right_node, -rpm*2.8)
+                print_velocity(left_node)
+                print_velocity(right_node)
+            elif key == "a":
+                set_velocity(right_node, rpm*2.8)
+                set_velocity(left_node, -rpm*0.8)
+            elif key == "d":
+                set_velocity(left_node, rpm*0.7)
+                set_velocity(right_node, -rpm*2.5)
+            elif key == "+":
+                rpm += 10
+                print(f"⚡ RPM = {rpm}")
+            elif key == "-":
+                rpm = max(0, rpm - 10)
+                print(f"⚡ RPM = {rpm}")
+            elif key == "j":
+                d = float(input("Distancia a mover (m): "))
+
+                if d > 5:
+                    print("❌ Distancia demasiado grande")
+                    break
+
+                mover_cuadrado_m(left_node, right_node, d, 200, R=0.15/2)
+            else:
+                # Soltar teclas = detener
+                set_velocity(left_node, 0)
+                set_velocity(right_node, 0)
+
+
+
+
+      #  client.loop_forever()
     except KeyboardInterrupt:
         print("🔴 Programa terminado por el usuario")
     finally:
+        # Apagar nodos al salir
         disable_node(left_node)
         disable_node(right_node)
         network.disconnect()
-        print("🔌 Conexión CAN cerrada")
+        print("✅ Motores apagados y red desconectada")
+
 
 
 if __name__ == "__main__":
