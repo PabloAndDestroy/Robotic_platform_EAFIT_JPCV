@@ -350,68 +350,98 @@ def main():
     # Hilo para procesar mensajes CAN
 
     # Loop MQTT (solo comunicación)
-    try:
-        rpm=0
-        while True:
-            print_velocity(left_node)
-            print_velocity(right_node)
-            pos_counts = locate(right_node)
-            pos_deg = get_angle_degrees(right_node)
-
-            print(f"Posición nodo der (counts): {pos_counts}")
-            print(f"Posición nodo der (grados): {pos_deg:.2f}°")
-            key = get_key().lower()
-            if key == "q":
-                break
-            elif key == "w":
-                set_velocity(right_node, rpm*2.8)
-                set_control_pid(right_node)
-                set_velocity(left_node, rpm*0.7)
-                print(f"Posición nodo der (grados): {pos_deg:.2f}°")
-
-
-            elif key == "s":
-                set_velocity(left_node, -rpm*0.7)
-                set_velocity(right_node, -rpm*2.8)
+    # Selección: control por teclado o MQTT
+    modo = int(input("Seleccione modo de control (1: teclado, 2: Thingworx): "))
+    if modo ==1:
+        print("➡️ Modo control por teclado seleccionado")
+        print("Controles:")
+        print(" W: Avanzar")
+        print(" S: Retroceder")
+        print(" A: Girar izquierda")
+        print(" D: Girar derecha")
+        print(" +: Aumentar RPM")
+        print(" -: Disminuir RPM")
+        print(" J: Mover en línea recta (m)")
+        print(" Q: Salir")
+        try:
+            rpm=0
+            while True:
                 print_velocity(left_node)
                 print_velocity(right_node)
-            elif key == "a":
-                set_velocity(right_node, rpm*2.8)
-                set_velocity(left_node, -rpm*0.8)
-            elif key == "d":
-                set_velocity(left_node, rpm*0.7)
-                set_velocity(right_node, -rpm*2.5)
-            elif key == "+":
-                rpm += 10
-                print(f"⚡ RPM = {rpm}")
-            elif key == "-":
-                rpm = max(0, rpm - 10)
-                print(f"⚡ RPM = {rpm}")
-            elif key == "j":
-                d = float(input("Distancia a mover (m): "))
+                pos_counts = locate(right_node)
+                pos_deg = get_angle_degrees(right_node)
 
-                if d > 5:
-                    print("❌ Distancia demasiado grande")
+                print(f"Posición nodo der (counts): {pos_counts}")
+                print(f"Posición nodo der (grados): {pos_deg:.2f}°")
+                key = get_key().lower()
+                if key == "q":
                     break
+                elif key == "w":
+                    set_velocity(right_node, rpm*2.8)
+                    set_control_pid(right_node)
+                    set_velocity(left_node, rpm*0.7)
+                    print(f"Posición nodo der (grados): {pos_deg:.2f}°")
 
-                mover_cuadrado_m(left_node, right_node, d, 200, R=0.15/2)
-            else:
+
+                elif key == "s":
+                    set_velocity(left_node, -rpm*0.7)
+                    set_velocity(right_node, -rpm*2.8)
+                    print_velocity(left_node)
+                    print_velocity(right_node)
+                elif key == "a":
+                    set_velocity(right_node, rpm*2.8)
+                    set_velocity(left_node, -rpm*0.8)
+                elif key == "d":
+                    set_velocity(left_node, rpm*0.7)
+                    set_velocity(right_node, -rpm*2.5)
+                elif key == "+":
+                    rpm += 10
+                    print(f"⚡ RPM = {rpm}")
+                elif key == "-":
+                    rpm = max(0, rpm - 10)
+                    print(f"⚡ RPM = {rpm}")
+                elif key == "j":
+                    d = float(input("Distancia a mover (m): "))
+
+                    if d > 5:
+                        print("❌ Distancia demasiado grande")
+                        break
+
+                    mover_cuadrado_m(left_node, right_node, d, 200, R=0.15/2)
+                else:
                 # Soltar teclas = detener
-                set_velocity(left_node, 0)
-                set_velocity(right_node, 0)
+                    set_velocity(left_node, 0)
+                    set_velocity(right_node, 0)
 
 
 
 
       #  client.loop_forever()
-    except KeyboardInterrupt:
-        print("🔴 Programa terminado por el usuario")
-    finally:
+        except KeyboardInterrupt:
+            print("🔴 Programa terminado por el usuario")
+        finally:
         # Apagar nodos al salir
-        disable_node(left_node)
-        disable_node(right_node)
-        network.disconnect()
-        print("✅ Motores apagados y red desconectada")
+            disable_node(left_node)
+            disable_node(right_node)
+            network.disconnect()
+            print("✅ Motores apagados y red desconectada")
+    elif modo ==2:
+        print("➡️ Modo Thingworx seleccionado")
+        client = mqtt.Client(userdata ={"left": left_node, "right": right_node})
+        client.username_pw_set(ADMIN, PASSWORD)
+        client.on_connect = on_connect
+        client.on_message = on_message
+        try:
+            client.connect(BROKER_EAFIT, 1883, 60)
+            client.loop_forever()
+        except KeyboardInterrupt:
+            print("🔴 Programa terminado por el usuario")
+        finally:
+        # Apagar nodos al salir
+            disable_node(left_node)
+            disable_node(right_node)
+            network.disconnect()
+            print("✅ Motores apagados y red desconectada")
 
 
 
