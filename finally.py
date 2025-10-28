@@ -243,8 +243,8 @@ def on_message(client, userdata, msg):
         if payload == 1:
             enable_node(left_node)
             enable_node(right_node)
-            set_control_pid(left_node)
-            set_control_pid(right_node)
+            #set_control_pid(left_node)
+            #set_control_pid(right_node)
         elif payload == 0:
             disable_node(left_node)
             disable_node(right_node)
@@ -298,11 +298,8 @@ def on_message(client, userdata, msg):
         payload = json.loads(msg.payload)
         print(f"📩 Mensaje recibido en {SQUARE_LABEL}: {payload}")
         if payload == 1:
-                set_velocity(node_left, speed * 0.8)
-                set_velocity(node_right, speed * 2.8)
-                time.sleep(5.91)
-                set_velocity(node_left, 0)
-                set_velocity(node_right, 0)
+            mover_cuadrado_m(left_node, right_node, 1, 200, R=0.15/2)
+
 
 def on_connect(client, userdata, flags, rc):
 
