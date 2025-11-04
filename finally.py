@@ -7,8 +7,13 @@ import termios
 import tty
 # Conexión MQTT
 import paho.mqtt.client as mqtt
+import RPI.GPIO as GPIO
 import json
 # Configuración
+
+
+LEFT_ID = 3
+RIGHT_ID = 127
 
 BROKER_EAFIT = "mqtt.dis.eafit.edu.co"          # label del dispositivo
 DEVICE_LABEL = "Antonia_thing"
@@ -25,9 +30,16 @@ SQUARE_LABEL = "Dibujar_cuadrado"
 CHANNEL = 'can0' # Canal en el que se conectan los Drivers
 BAUDRATE = 125000 # Velocidad de comunicación
 EDS_FILE = "BGE.eds" # Archivo EDS del Driver
+ENCODER = "Encoder_1"
+SENSOR_1 = "Sensor_1"
+#-----------------------------Pines sensores----------------------------------------------------------#
+ECHO_PIN = 11 
+TRIG_PIN = 7
 
-LEFT_ID = 3
-RIGHT_ID = 127
+
+
+# CONFIGURACION INTERNA DEL PUERTO CAN PARA CONTROLAR LOS MOTORES
+
 def reset_node(node):
     try:
         node.sdo['Controlword'].raw = 0x80  # Reset command
@@ -74,6 +86,11 @@ def set_velocity(node, rpm):
 
     except Exception as e:
         print(f"❌ Error enviando velocidad al nodo {node.id}: {e}")
+
+#-------------------------------------------------------------------------------------------------#
+
+# LECTURA DE VARIABLES DEL SISTEMA 
+
 def get_velocity(node):
     try:
         # feedback for controller
@@ -143,6 +160,35 @@ def print_velocity(node):
         print(f"Velocidad nodo {node.id}: {vel}")
     except Exception as e:
         print(f"❌ Error leyendo velocidad del nodo {node.id}: {e}")
+
+def get_distance(echo, trig):
+    GPIO.setwarnings(False)
+    GPIO.setmode(GPIO.BOARD)
+    GPIO.setup(TRIG_PIN, GPIO.OUT)
+    GPIO.setup(ECHO_PIN, GPIO.IN)
+    
+    # Enviar pulso ultrasónico
+    while True:
+        GPIO.output(trig, False)
+        time.sleep(0.5)
+        GPIO.output(trig, True)
+        time.sleep(0.00001)
+        GPIO.output(trig, False)
+        # medir respuesta
+        while GPIO.input(echo)==0:
+            pulse_start = time.time()
+        while GPIO.input(echo)==1:
+            pulse_end = time.time()
+        duracion = pulse_end-pulse_start
+        distancia = duracion * 340/2
+        distancia = distancia * 100  # convertir a cm
+        return distancia
+    
+#-----------------------------------------------------------------------------------------------#
+
+# Acciones de movimiento
+
+
 def mover_linea_recta(node_left, node_right, distance, speed):
     #rpm a velocidad lineal
     #relacion de reduccion 1:80
@@ -311,6 +357,8 @@ def on_connect(client, userdata, flags, rc):
     left_topic = f"/Thingworx/{DEVICE_LABEL}/{LEFT_LABEL}"
     vel_topic = f"/Thingworx/{DEVICE_LABEL}/{VEL_LABEL}"
     square_topic = f"/Thingworx/{DEVICE_LABEL}/{SQUARE_LABEL}"
+    enconder_topic = f"/Thingworx/{DEVICE_LABEL}/{ENCODER}"
+    ultrasonic_topic = f"/Thingworx/{DEVICE_LABEL}/{SENSOR_1}"
     client.subscribe(on_topic)
     client.subscribe(up_topic)
     client.subscribe(down_topic)
@@ -318,6 +366,9 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe(left_topic)
     client.subscribe(vel_topic)
     client.subscribe(square_topic)
+    angulo = get_angle_degrees(userdata["right"])
+    client.publish(enconder_topic, json.dumps({f"{ENCODER}": angulo}))
+    client.publish(ultrasonic_topic, json.dumps({f"{SENSOR_1}": get_distance(ECHO_PIN, TRIG_PIN)}))
     print(f"📡 Suscrito al topic: {on_topic}")
     print(f"📡 Suscrito al topic: {up_topic}\n")
     print(f"📡 Suscrito al topic: {down_topic}\n")
@@ -330,8 +381,10 @@ def main():
     network.connect(channel=CHANNEL, bustype='socketcan', bitrate=BAUDRATE)
     left_node = network.add_node(LEFT_ID, EDS_FILE)
     right_node = network.add_node(RIGHT_ID, EDS_FILE)
-    enable_node(left_node)
-    enable_node(right_node)
+    #enable_node(left_node)
+    #enable_node(right_node)
+    #set_velocity(left_node, 0)
+    #set_velocity(right_node, 0)
     """try:
         network.connect(channel=CHANNEL, bustype='socketcan', bitrate=BAUDRATE)
 
@@ -350,6 +403,10 @@ def main():
     # Selección: control por teclado o MQTT
     modo = int(input("Seleccione modo de control (1: teclado, 2: Thingworx): "))
     if modo ==1:
+        enable_node(left_node)
+        enable_node(right_node)
+        set_velocity(left_node, 0)
+        set_velocity(right_node, 0)
         print("➡️ Modo control por teclado seleccionado")
         print("Controles:")
         print(" W: Avanzar")
