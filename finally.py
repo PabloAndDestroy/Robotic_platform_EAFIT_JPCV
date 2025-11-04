@@ -503,8 +503,11 @@ def main():
         client.username_pw_set(ADMIN, PASSWORD)
         client.on_connect = on_connect
         client.on_message = on_message
+        
+
         try:
             client.connect(BROKER_EAFIT, 1883, 60)
+            enviar_datos(client, left_node, right_node)
             client.loop_forever()
         except KeyboardInterrupt:
             print("🔴 Programa terminado por el usuario")
