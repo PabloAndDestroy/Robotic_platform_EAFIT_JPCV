@@ -164,24 +164,37 @@ def print_velocity(node):
 def get_distance(echo, trig):
     GPIO.setwarnings(False)
     GPIO.setmode(GPIO.BOARD)
-    GPIO.setup(TRIG_PIN, GPIO.OUT)
-    GPIO.setup(ECHO_PIN, GPIO.IN)
+    GPIO.setup(trig, GPIO.OUT)
+    GPIO.setup(echo, GPIO.IN)
+    
+    # Asegurar que el trigger está en bajo
+    GPIO.output(trig, False)
+    time.sleep(0.05)  # Tiempo de estabilización
     
     # Enviar pulso ultrasónico
-    
-    GPIO.output(trig, False)
-    time.sleep(0.5)
     GPIO.output(trig, True)
     time.sleep(0.00001)
     GPIO.output(trig, False)
-    # medir respuesta
-    while GPIO.input(echo)==0:
+    
+    # Medir respuesta con timeouts para evitar bucles infinitos
+    timeout_start = time.time()
+    while GPIO.input(echo) == 0:
         pulse_start = time.time()
-    while GPIO.input(echo)==1:
+        if pulse_start - timeout_start > 0.1:  # Timeout de 100ms
+            return -1  # Error: no se detectó el pulso
+    
+    timeout_start = time.time()
+    while GPIO.input(echo) == 1:
         pulse_end = time.time()
-    duracion = pulse_end-pulse_start
-    distancia = duracion * 340/2
-    distancia = distancia * 100  # convertir a cm
+        if pulse_end - timeout_start > 0.1:  # Timeout de 100ms
+            return -1  # Error: pulso demasiado largo
+    
+    duracion = pulse_end - pulse_start
+    
+    # Calcular distancia (velocidad del sonido ~343 m/s a 20°C)
+    # distancia = (duracion * 34300) / 2  # en cm
+    distancia = (duracion * 34300) / 2
+    
     return distancia
     
 #-----------------------------------------------------------------------------------------------#
@@ -376,24 +389,25 @@ def on_connect(client, userdata, flags, rc):
     print(f"📡 Suscrito al topic: {left_topic}\n")
     print(f"📡 Suscrito al topic: {vel_topic}\n")
     print(f"📡 Suscrito al topic: {square_topic}\n")
+    
 def enviar_datos(client, left_node, right_node):
     ultrasonic_topic = f"/Thingworx/{DEVICE_LABEL}/{SENSOR_1}"
     encoder_topic = f"/Thingworx/{DEVICE_LABEL}/{ENCODER}"
 
-    while True:
-        try:
-            distancia = get_distance(ECHO_PIN, TRIG_PIN)
-            angulo = get_angle_degrees(right_node)
+    
+    try:
+        distancia = get_distance(ECHO_PIN, TRIG_PIN)
+        angulo = get_angle_degrees(right_node)
 
-            client.publish(ultrasonic_topic, json.dumps({SENSOR_1: distancia}))
-            client.publish(encoder_topic, json.dumps({ENCODER: angulo}))
+        client.publish(ultrasonic_topic, json.dumps({SENSOR_1: distancia}))
+        client.publish(encoder_topic, json.dumps({ENCODER: angulo}))
 
-            print(f"📤 Sensor_1 = {distancia:.2f} cm | Encoder_1 = {angulo:.2f}°")
-            time.sleep(1)
+        print(f"📤 Sensor_1 = {distancia:.2f} cm | Encoder_1 = {angulo:.2f}°")
+        time.sleep(1)
 
-        except Exception as e:
-            print(f"⚠️ Error enviando datos: {e}")
-            time.sleep(2)
+    except Exception as e:
+        print(f"⚠️ Error enviando datos: {e}")
+        time.sleep(2)
 def main():
     network = canopen.Network()
     network.connect(channel=CHANNEL, bustype='socketcan', bitrate=BAUDRATE)
@@ -503,6 +517,8 @@ def main():
         client.username_pw_set(ADMIN, PASSWORD)
         client.on_connect = on_connect
         client.on_message = on_message
+        distancia = get_distance(ECHO_PIN, TRIG_PIN)
+        print(f"distancia sensor: {distancia}")
         
 
         try:
