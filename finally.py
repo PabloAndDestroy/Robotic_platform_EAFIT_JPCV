@@ -36,7 +36,140 @@ SENSOR_1 = "Sensor_1"
 ECHO_PIN = 11 
 TRIG_PIN = 7
 
+### IOT
+estado_movimiento = {"up": 0, "down": 0, "left": 0, "right": 0}
 
+def _parse_payload(raw_payload, label):
+    """
+    Acepta payloads: 1, 0, {"Mover_adelante":1}, {"some":1, ...}
+    Devuelve int(0/1) o None si no encuentra.
+    """
+    try:
+        if isinstance(raw_payload, dict):
+            # intenta obtener por label (clave) si viene como objeto
+            if label in raw_payload:
+                return int(raw_payload[label])
+            # si es un dict sin la clave exacta, toma el primer valor numérico
+            for v in raw_payload.values():
+                try:
+                    return int(v)
+                except Exception:
+                    continue
+            return None
+        else:
+            return int(raw_payload)
+    except Exception:
+        return None
+
+def mover_robot(estado, left_node, right_node):
+    """
+    Ejecuta el movimiento según el estado actual.
+    Prioridad: up > down > left > right (puedes cambiarlo).
+    """
+    rpm = getattr(Estado_vel, "rpm", 0)  # usa Estado_vel.rpm si existe
+    # Determina prioridad: si quieres combinaciones distintas, cambia la lógica.
+    if estado.get("up"):
+        set_velocity(left_node, rpm * 0.8)
+        set_velocity(right_node, rpm * 2.8)
+    elif estado.get("down"):
+        set_velocity(left_node, -rpm * 0.8)
+        set_velocity(right_node, -rpm * 2.8)
+    elif estado.get("left"):
+        set_velocity(left_node, -rpm * 0.8)
+        set_velocity(right_node, rpm * 2.8)
+    elif estado.get("right"):
+        set_velocity(left_node, rpm * 0.8)
+        set_velocity(right_node, -rpm * 2.8)
+    else:
+        # Ninguna dirección activa -> detener
+        set_velocity(left_node, 0)
+        set_velocity(right_node, 0)
+
+def on_message(client, userdata, msg):
+    left_node = userdata["left"]
+    right_node = userdata["right"]
+
+    # parsear topic y payload
+    topic = msg.topic
+    try:
+        raw_payload = json.loads(msg.payload)
+    except Exception:
+        # si no es json, intenta interpretar como entero directo
+        try:
+            raw_payload = int(msg.payload)
+        except Exception:
+            raw_payload = msg.payload
+
+    # --- ON / OFF global (igual que tenías) ---
+    if topic == f"/Thingworx/{DEVICE_LABEL}/{ON_LABEL}":
+        value = _parse_payload(raw_payload, ON_LABEL)
+        if value == 1:
+            enable_node(left_node)
+            enable_node(right_node)
+        elif value == 0:
+            disable_node(left_node)
+            disable_node(right_node)
+        return
+
+    # --- Velocidad ---
+    if topic == f"/Thingworx/{DEVICE_LABEL}/{VEL_LABEL}":
+        print(f"📩 Mensaje recibido en {VEL_LABEL}: {raw_payload}")
+        try:
+            Estado_vel.rpm = int(float(raw_payload))
+        except Exception:
+            pass
+        return
+
+    # --- Direcciones: actualizamos estado y ejecutamos mover_robot ---
+    if topic == f"/Thingworx/{DEVICE_LABEL}/{UP_LABEL}":
+        print(f"📩 Mensaje recibido en {UP_LABEL}: {raw_payload}")
+        val = _parse_payload(raw_payload, UP_LABEL)
+        if val is not None:
+            estado_movimiento["up"] = val
+            # si activas up, seguramente quieras desactivar down (opcional):
+            if val == 1:
+                estado_movimiento["down"] = 0
+        mover_robot(estado_movimiento, left_node, right_node)
+        return
+
+    if topic == f"/Thingworx/{DEVICE_LABEL}/{DOWN_LABEL}":
+        print(f"📩 Mensaje recibido en {DOWN_LABEL}: {raw_payload}")
+        val = _parse_payload(raw_payload, DOWN_LABEL)
+        if val is not None:
+            estado_movimiento["down"] = val
+            if val == 1:
+                estado_movimiento["up"] = 0
+        mover_robot(estado_movimiento, left_node, right_node)
+        return
+
+    if topic == f"/Thingworx/{DEVICE_LABEL}/{LEFT_LABEL}":
+        print(f"📩 Mensaje recibido en {LEFT_LABEL}: {raw_payload}")
+        val = _parse_payload(raw_payload, LEFT_LABEL)
+        if val is not None:
+            estado_movimiento["left"] = val
+            if val == 1:
+                # opcional: desactivar derecha
+                estado_movimiento["right"] = 0
+        mover_robot(estado_movimiento, left_node, right_node)
+        return
+
+    if topic == f"/Thingworx/{DEVICE_LABEL}/{RIGHT_LABEL}":
+        print(f"📩 Mensaje recibido en {RIGHT_LABEL}: {raw_payload}")
+        val = _parse_payload(raw_payload, RIGHT_LABEL)
+        if val is not None:
+            estado_movimiento["right"] = val
+            if val == 1:
+                estado_movimiento["left"] = 0
+        mover_robot(estado_movimiento, left_node, right_node)
+        return
+
+    # --- Dibujar cuadrado (ejecución puntual) ---
+    if topic == f"/Thingworx/{DEVICE_LABEL}/{SQUARE_LABEL}":
+        val = _parse_payload(raw_payload, SQUARE_LABEL)
+        print(f"📩 Mensaje recibido en {SQUARE_LABEL}: {raw_payload}")
+        if val == 1:
+            mover_cuadrado_m(left_node, right_node, 1, 200, R=0.15/2)
+        return
 
 # CONFIGURACION INTERNA DEL PUERTO CAN PARA CONTROLAR LOS MOTORES
 
@@ -238,8 +371,18 @@ def mover_cuadrado_m(node_left, node_right, side_length, speed, R=0.15/2):
     state = 0
     start_time = time.time()
     speed = 200
+    # Calibrar angulo de giro a 0 para iniciar
+    angulo = get_angle_degrees(node_right)
+    while angulo > 5:
+        angulo = get_angle_degrees(node_right)
+        set_velocity(node_left, speed*0.8)
+        set_velocity(node_right, -speed*2.8)
+        if angulo <= 5:
+            set_velocity(node_left, 0)
+            set_velocity(node_right, 0)
+            break
     tiempo_avance = side_length/0.169    # tiempo para avanzar un lado
-    tiempo_giro = 2.2     # tiempo estimado para girar 90°
+    tiempo_giro = 2.1     # tiempo estimado para girar 90°
 
     while sides_completed < 4:
         if state == 0:
@@ -292,7 +435,7 @@ def girar_rueda_360(node_left, node_right, speed):
 class Estado_vel:
     rpm = 0
 
-
+"""
 def on_message(client, userdata, msg):
     left_node = userdata["left"]
     right_node = userdata["right"]
@@ -359,7 +502,7 @@ def on_message(client, userdata, msg):
         if payload == 1:
             mover_cuadrado_m(left_node, right_node, 1, 200, R=0.15/2)
 
-
+"""
 def on_connect(client, userdata, flags, rc):
 
     print("🟢 Conectado al broker MQTT con código:", rc)
@@ -512,6 +655,7 @@ def main():
             network.disconnect()
             print("✅ Motores apagados y red desconectada")
     elif modo ==2:
+        estado_movimiento = {"up": 0, "down": 0, "left": 0, "right": 0}
         print("➡️ Modo Thingworx seleccionado")
         client = mqtt.Client(userdata ={"left": left_node, "right": right_node})
         client.username_pw_set(ADMIN, PASSWORD)
