@@ -33,8 +33,8 @@ EDS_FILE = "BGE.eds" # Archivo EDS del Driver
 ENCODER = "Encoder_1"
 SENSOR_1 = "Sensor_1"
 #-----------------------------Pines sensores----------------------------------------------------------#
-ECHO_PIN = 11 
-TRIG_PIN = 7
+ECHO_PIN = 15
+TRIG_PIN = 13
 
 ### IOT
 estado_movimiento = {"up": 0, "down": 0, "left": 0, "right": 0}
@@ -222,7 +222,7 @@ def set_velocity(node, rpm):
 
 #-------------------------------------------------------------------------------------------------#
 
-# LECTURA DE VARIABLES DEL SISTEMA 
+# LECTURA DE VARIABLES DEL SISTEMA
 
 def get_velocity(node):
     try:
@@ -299,37 +299,37 @@ def get_distance(echo, trig):
     GPIO.setmode(GPIO.BOARD)
     GPIO.setup(trig, GPIO.OUT)
     GPIO.setup(echo, GPIO.IN)
-    
+
     # Asegurar que el trigger está en bajo
     GPIO.output(trig, False)
     time.sleep(0.05)  # Tiempo de estabilización
-    
+
     # Enviar pulso ultrasónico
     GPIO.output(trig, True)
-    time.sleep(0.00001)
+    time.sleep(0.01)
     GPIO.output(trig, False)
-    
+
     # Medir respuesta con timeouts para evitar bucles infinitos
     timeout_start = time.time()
     while GPIO.input(echo) == 0:
         pulse_start = time.time()
         if pulse_start - timeout_start > 0.1:  # Timeout de 100ms
             return -1  # Error: no se detectó el pulso
-    
+
     timeout_start = time.time()
     while GPIO.input(echo) == 1:
         pulse_end = time.time()
         if pulse_end - timeout_start > 0.1:  # Timeout de 100ms
             return -1  # Error: pulso demasiado largo
-    
+
     duracion = pulse_end - pulse_start
-    
+
     # Calcular distancia (velocidad del sonido ~343 m/s a 20°C)
     # distancia = (duracion * 34300) / 2  # en cm
     distancia = (duracion * 34300) / 2
-    
+
     return distancia
-    
+
 #-----------------------------------------------------------------------------------------------#
 
 # Acciones de movimiento
@@ -532,12 +532,12 @@ def on_connect(client, userdata, flags, rc):
     print(f"📡 Suscrito al topic: {left_topic}\n")
     print(f"📡 Suscrito al topic: {vel_topic}\n")
     print(f"📡 Suscrito al topic: {square_topic}\n")
-    
+
 def enviar_datos(client, left_node, right_node):
     ultrasonic_topic = f"/Thingworx/{DEVICE_LABEL}/{SENSOR_1}"
     encoder_topic = f"/Thingworx/{DEVICE_LABEL}/{ENCODER}"
 
-    
+
     try:
         distancia = get_distance(ECHO_PIN, TRIG_PIN)
         angulo = get_angle_degrees(right_node)
@@ -656,6 +656,9 @@ def main():
             print("✅ Motores apagados y red desconectada")
     elif modo ==2:
         estado_movimiento = {"up": 0, "down": 0, "left": 0, "right": 0}
+
+        distance = get_distance(ECHO_PIN, TRIG_PIN)
+        print(f"Distancia inicial sensor: {distance} cm")
         print("➡️ Modo Thingworx seleccionado")
         client = mqtt.Client(userdata ={"left": left_node, "right": right_node})
         client.username_pw_set(ADMIN, PASSWORD)
@@ -663,7 +666,7 @@ def main():
         client.on_message = on_message
         distancia = get_distance(ECHO_PIN, TRIG_PIN)
         print(f"distancia sensor: {distancia}")
-        
+
 
         try:
             client.connect(BROKER_EAFIT, 1883, 60)
